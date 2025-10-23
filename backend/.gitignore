@@ -1,0 +1,39 @@
+# OS/editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.pyre/
+.coverage
+coverage/
+htmlcov/
+.env
+.venv/
+venv/
+backend/venv/
+
+# Node/JS (generic)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Build artifacts
+dist/
+build/
+.cache/
+.temp/
+.tmp/

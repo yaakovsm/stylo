@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+
+.env
+.git/
+.vscode/
+.idea/
+Dockerfile
