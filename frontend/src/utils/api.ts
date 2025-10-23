@@ -2,7 +2,7 @@
 
 // === Base URLs ===
 const LOCAL_API_URL = "http://localhost:8000";
-const PROD_API_URL = "https://stylo-api.onrender.com"; // change to the actual Render address
+const PROD_API_URL = "https://stylo-backend.onrender.com";
 
 // automatically choose the API base URL based on the environment
 const API_BASE =
