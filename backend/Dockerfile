@@ -13,14 +13,8 @@ COPY backend/app ./app
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=15s --timeout=3s --retries=5 \
-  CMD python - <<'PY' || exit 1
-import sys, urllib.request
-try:
-    urllib.request.urlopen("http://localhost:8000/", timeout=2)
-    sys.exit(0)
-except Exception:
-    sys.exit(1)
-PY
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=5 CMD curl --fail http://localhost:8000/ || exit 1
 
 CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

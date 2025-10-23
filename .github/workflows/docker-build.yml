@@ -28,7 +28,6 @@ jobs:
         id: vars
         run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      # אין צורך בקובץ env בריפו; מייצרים זמני מריפוזיטורי סיקרטס
       - name: Create backend .env file
         run: |
           echo "REPLICATE_API_TOKEN=${{ secrets.REPLICATE_API_TOKEN }}" >> backend/.env
