@@ -13,9 +13,18 @@ app = FastAPI(
 # ===== CORS =====
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://stylo-frontend.onrender.com")
 
+
+allowed_origins = [
+    FRONTEND_URL,
+    FRONTEND_URL.rstrip("/"),
+    FRONTEND_URL + "/",
+    "https://stylo-frontend.onrender.com",
+    "https://stylo-frontend.onrender.com/",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
