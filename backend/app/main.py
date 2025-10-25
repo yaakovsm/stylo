@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import ai
+import os
 
 app = FastAPI(
     title="Stylo API",
@@ -10,9 +11,15 @@ app = FastAPI(
 )
 
 # ===== CORS =====
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://stylo-frontend.onrender.com")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # change to your frontend domain in production
+    allow_origins=[
+        FRONTEND_URL,
+        "http://localhost:5173",  # for local dev (Vite default)
+        "http://localhost:8080",  # for Docker local frontend
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
