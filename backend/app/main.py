@@ -15,11 +15,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "https://stylo-frontend.onrender.com")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        FRONTEND_URL,
-        "http://localhost:5173",  # for local dev (Vite default)
-        "http://localhost:8080",  # for Docker local frontend
-    ],
+    allow_origins=[FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

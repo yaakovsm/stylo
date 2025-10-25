@@ -228,8 +228,8 @@ async def generate_sdxl_image(prompt: str) -> str:
         raise HTTPException(status_code=500, detail="REPLICATE_API_TOKEN not set")
 
     model_candidates = [
-        os.getenv("REPLICATE_MODEL") or "stability-ai/sdxl",
-        "stability-ai/stable-diffusion-xl-base-1.0",
+    "stability-ai/stable-diffusion-xl-base-1.0",
+    "black-forest-labs/flux-schnell",  # modern fallback model
     ]
     max_retries, delay = 3, 3
     prompt = prompt.strip()[:4000]
@@ -263,7 +263,7 @@ async def generate_sdxl_image(prompt: str) -> str:
                 urls = list(output) if output else []
                 if not urls:
                     raise ValueError("No image URL returned")
-                logger.info(f"✅ Image generated via {model_slug}")
+                logger.info(f"Image generated via {model_slug}")
                 return urls[0]
             except Exception as e:
                 logger.warning(f"Attempt {attempt} failed for {model_slug}: {e}")
