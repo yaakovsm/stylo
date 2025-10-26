@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import time
 import logging
 import asyncio
@@ -8,20 +9,42 @@ from fastapi import HTTPException
 from openai import AsyncOpenAI, OpenAI
 import replicate
 
-# ========== CONFIGURATION ==========
+# ====== CONFIGURATION ======
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load environment (only for local dev)
 if os.getenv("ENV") != "production":
     from dotenv import load_dotenv
     load_dotenv()
 
-# Initialize OpenAI clients
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 sync_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# ========== STREAMING RECOMMENDATIONS ==========
+
+# ====== HELPER: SAFE JSON PARSER ======
+def safe_parse_json(text: str) -> dict:
+    """Try to extract a valid JSON object from the OpenAI response."""
+    try:
+        match = re.search(r"\{(?:[^{}]|(?R))*\}", text, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+    except Exception:
+        pass
+
+    try:
+        fixed = (
+            text.strip()
+            .replace("```json", "")
+            .replace("```", "")
+            .replace("JSON:", "")
+        )
+        return json.loads(fixed)
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to parse JSON: {e}")
+        return {}
+
+
+# ====== STREAMING RECOMMENDATIONS ======
 async def stream_recommendations(
     clothing_item: str,
     color: str = "",
@@ -34,7 +57,8 @@ async def stream_recommendations(
 
     style_instruction = (
         f"Generate 3 distinct style inspirations strictly following: {', '.join(style)}."
-        if style else f"Generate 3 distinct style inspirations for {gender}'s {primary_item_description}."
+        if style
+        else f"Generate 3 distinct style inspirations for {gender}'s {primary_item_description}."
     )
 
     prompt = f"""
@@ -46,7 +70,7 @@ Primary clothing item: {primary_item_description}
 """
 
     try:
-        logger.info(f"Streaming response for: {primary_item_description}")
+        logger.info(f"🔹 Streaming response for: {primary_item_description}")
         stream = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -66,16 +90,14 @@ Primary clothing item: {primary_item_description}
         yield json.dumps({"error": str(e)})
 
 
-# ========== MAIN RECOMMENDATION GENERATOR ==========
+# ====== FASHION RECOMMENDATION GENERATOR ======
 async def get_recommendations(
     clothing_item: str,
     color: str = "",
     style: Optional[List[str]] = None,
     gender: str = "men",
 ) -> dict:
-    """
-    Generate fashion style recommendations, color palette, and outfit prompts.
-    """
+    """Generate style recommendations, color palette, and outfit prompts using OpenAI."""
     style = style or []
     primary_item_description = f"{color} {clothing_item}".strip()
 
@@ -114,10 +136,18 @@ Primary clothing item: {primary_item_description}
 """
 
     try:
+        logger.info(f"🧵 Generating recommendations for: {primary_item_description}")
+
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": f"You are a professional fashion stylist AI for {gender}'s fashion."},
+                {
+                    "role": "system",
+                    "content": (
+                        f"You are a skilled fashion stylist AI for {gender}'s fashion. "
+                        "Always return structured JSON, no extra text."
+                    ),
+                },
                 {"role": "user", "content": prompt},
             ],
             max_tokens=1200,
@@ -125,27 +155,29 @@ Primary clothing item: {primary_item_description}
         )
 
         content = response.choices[0].message.content
-        start, end = content.find("{"), content.rfind("}") + 1
-        json_str = content[start:end]
-        data = json.loads(json_str)
+        data = safe_parse_json(content)
 
-        # Add improved image prompts
+        if not data:
+            raise ValueError("No valid JSON extracted from model response")
+
+        # Enhance prompts for image generation
         for i, outfit in enumerate(data.get("outfits", [])):
             style_desc = data["style_inspirations"][i % len(data["style_inspirations"])]["description"]
-            parts = [p for p in [outfit.get("top"), outfit.get("pants"), outfit.get("shoes")] if p]
-            outfit_text = ", ".join(parts)
+            outfit_parts = [p for p in [outfit.get("top"), outfit.get("pants"), outfit.get("shoes")] if p]
+            outfit_text = ", ".join(outfit_parts)
+
             data["outfits"][i]["image_prompt"] = (
-                f"Full body fashion photo of a {gender} wearing: {outfit_text}. "
-                f"Primary item: {primary_item_description}. "
-                f"Style: {style_desc.lower()}. "
-                f"Editorial lighting, clean background, sharp focus."
+                f"Full body realistic photo of a {gender} wearing: {outfit_text}. "
+                f"The {primary_item_description} must be clearly visible and accurate in color and shape. "
+                f"Keep outfit consistent with the described garments and colors. "
+                f"Style: {style_desc.lower()}. Editorial lighting, clean background."
             )
 
         for i, style_insp in enumerate(data.get("style_inspirations", [])):
             desc = style_insp["description"]
             data["style_inspirations"][i]["main_image_prompt"] = (
-                f"Full body fashion photo of a {gender} in {desc}. "
-                f"Include the {primary_item_description}. Clean background, professional lighting."
+                f"Full body realistic fashion photo of a {gender} in {desc}. "
+                f"Include the {primary_item_description}, clean studio background, professional lighting."
             )
 
         return data
@@ -171,12 +203,9 @@ Primary clothing item: {primary_item_description}
         }
 
 
-# ========== IMAGE GENERATION (Replicate with smart fallback) ==========
+# ====== IMAGE GENERATION ======
 async def generate_sdxl_image(prompt: str) -> str:
-    """
-    Generate a fashion image using Stable Diffusion XL or Flux via Replicate.
-    Automatically adjusts parameters per model and retries with fallback if needed.
-    """
+    """Generate a fashion image using Stable Diffusion XL or Flux via Replicate."""
     token = os.getenv("REPLICATE_API_TOKEN")
     if not token:
         raise HTTPException(status_code=500, detail="REPLICATE_API_TOKEN not set")
@@ -193,12 +222,11 @@ async def generate_sdxl_image(prompt: str) -> str:
         f"neutral background, editorial fashion photo. Do not alter specified garments or colors."
     )
     negative_prompt = (
-        "cropped, out of frame, missing feet, cut off legs, lowres, blurry, "
-        "wrong color, mismatched outfit, text, watermark, logo"
+        "cropped, out of frame, missing feet, cut off legs, lowres, blurry, wrong color, "
+        "mismatched outfit, text, watermark, logo"
     )
 
     last_error = None
-
     for attempt in range(1, max_retries + 1):
         for model_slug in model_candidates:
             try:
@@ -219,18 +247,14 @@ async def generate_sdxl_image(prompt: str) -> str:
                     }
 
                 output = await asyncio.to_thread(
-                    replicate.run,
-                    model_slug,
-                    input=input_params,
-                    timeout=120,
+                    replicate.run, model_slug, input=input_params, timeout=120
                 )
-
                 urls = list(output) if output else []
                 if urls:
-                    logger.info(f"Image generated successfully via {model_slug}")
+                    logger.info(f"✅ Image generated via {model_slug}")
                     return urls[0]
-                else:
-                    raise ValueError("No image URL returned")
+
+                raise ValueError("No image URL returned")
 
             except Exception as e:
                 logger.warning(f"Attempt {attempt} failed for {model_slug}: {e}")
@@ -240,7 +264,6 @@ async def generate_sdxl_image(prompt: str) -> str:
         if attempt < max_retries:
             await asyncio.sleep(delay * attempt)
 
-    logger.error(f"All attempts failed. Last error: {last_error}")
     raise HTTPException(
         status_code=500,
         detail=f"Image generation failed after {max_retries} retries. Last error: {last_error}",
