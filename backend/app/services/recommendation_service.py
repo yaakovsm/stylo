@@ -40,7 +40,7 @@ def safe_parse_json(text: str) -> dict:
         )
         return json.loads(fixed)
     except Exception as e:
-        logger.warning(f"⚠️ Failed to parse JSON: {e}")
+        logger.warning(f"Failed to parse JSON: {e}")
         return {}
 
 
@@ -70,7 +70,7 @@ Primary clothing item: {primary_item_description}
 """
 
     try:
-        logger.info(f"🔹 Streaming response for: {primary_item_description}")
+        logger.info(f"Streaming response for: {primary_item_description}")
         stream = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -136,7 +136,7 @@ Primary clothing item: {primary_item_description}
 """
 
     try:
-        logger.info(f"🧵 Generating recommendations for: {primary_item_description}")
+        logger.info(f"Generating recommendations for: {primary_item_description}")
 
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
@@ -251,7 +251,7 @@ async def generate_sdxl_image(prompt: str) -> str:
                 )
                 urls = list(output) if output else []
                 if urls:
-                    logger.info(f"✅ Image generated via {model_slug}")
+                    logger.info(f"Image generated via {model_slug}")
                     return urls[0]
 
                 raise ValueError("No image URL returned")
